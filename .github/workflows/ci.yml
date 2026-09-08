@@ -61,13 +61,20 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and push image with ACR Tasks
-        # `az acr build` builds the image server-side in ACR and pushes it — no
-        # local Docker/Buildx needed. The federated identity needs AcrPush on
-        # the registry.
+      - name: Log in to ACR (Docker)
+        # Some subscriptions (free/sponsored tiers) block ACR Tasks
+        # (TasksOperationsNotAllowed), so we build locally on the runner with
+        # Docker and push directly instead of using `az acr build`.
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Build image
         run: |
-          az acr build \
-            --registry "$ACR_NAME" \
-            --image "k8s-sentry:${GITHUB_SHA::7}" \
-            --image "k8s-sentry:latest" \
+          docker build \
+            -t "$ACR_NAME.azurecr.io/k8s-sentry:${GITHUB_SHA::7}" \
+            -t "$ACR_NAME.azurecr.io/k8s-sentry:latest" \
             .
+
+      - name: Push image
+        run: |
+          docker push "$ACR_NAME.azurecr.io/k8s-sentry:${GITHUB_SHA::7}"
+          docker push "$ACR_NAME.azurecr.io/k8s-sentry:latest"
